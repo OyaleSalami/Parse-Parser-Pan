@@ -1,0 +1,245 @@
+@page "/dictionary"
+@rendermode InteractiveServer
+@inject PanDbContext DbContext
+
+<div class="container py-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col">
+            <h1 class="display-5 text-primary fw-bold"><i class="bi bi-book"></i> Greek Dictionary</h1>
+            <p class="text-muted">Manage your Koine Greek vocabulary, translations, and grammatical forms.</p>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-success btn-lg shadow-sm" @onclick="ShowAddWordForm">
+                <i class="bi bi-plus-circle"></i> Add New Lemma
+            </button>
+        </div>
+    </div>
+
+    @if (showAddForm)
+    {
+        <div class="card shadow-lg mb-5 border-0 bg-light">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0"><i class="bi bi-pencil-square"></i> Add New Word (Lemma)</h4>
+            </div>
+            <div class="card-body p-4">
+                <EditForm Model="newWord" OnValidSubmit="SaveNewWord" FormName="AddWordForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary class="text-danger" />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Greek Lemma (Base Form)</label>
+                            <input type="text" class="form-control form-control-lg text-primary fw-bold" @bind-value="newWord.GreekLemma" placeholder="e.g., λόγος, λύω" required lang="el" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Part of Speech</label>
+                            <InputSelect class="form-select form-select-lg" @bind-Value="newWord.PartOfSpeech">
+                                @foreach (var pos in Enum.GetValues<PartOfSpeech>())
+                                {
+                                    <option value="@pos">@pos</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">English Definition / Translation</label>
+                            <input type="text" class="form-control" @bind-value="newWord.DefinitionEn" placeholder="e.g., word, speech, reason" required />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes / Usage</label>
+                            <textarea class="form-control" @bind="newWord.Notes" rows="3" placeholder="Optional grammatical notes, context, or examples..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-end">
+                        <button type="button" class="btn btn-outline-secondary me-2" @onclick="CancelAddForm">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4">Save Word</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <!-- Dictionary List -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light text-secondary">
+                        <tr>
+                            <th scope="col" class="ps-4">Greek Lemma</th>
+                            <th scope="col">Part of Speech</th>
+                            <th scope="col">Definition</th>
+                            <th scope="col">Inflections (Word Forms)</th>
+                            <th scope="col" class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (words == null || !words.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-journal-x display-4 d-block mb-3"></i>
+                                    No words added to the dictionary yet.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var word in words)
+                            {
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="fs-4 text-primary fw-bold" lang="el">@word.GreekLemma</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary px-3 py-2">@word.PartOfSpeech</span>
+                                    </td>
+                                    <td>@word.DefinitionEn</td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach (var form in word.WordForms)
+                                            {
+                                                <span class="badge bg-light text-dark border border-secondary-subtle px-2 py-1" title="@form.Morphology" lang="el">
+                                                    @form.Form
+                                                    <button type="button" class="btn-close ms-1 btn-form-delete" style="font-size: 0.5rem;" @onclick="() => DeleteWordForm(form)"></button>
+                                                </span>
+                                            }
+                                            <button class="btn btn-sm btn-outline-primary py-0 px-2" @onclick="() => ShowAddFormModal(word)">
+                                                <i class="bi bi-plus"></i> Add Form
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteWord(word)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Adding Word Form -->
+@if (activeWordForAddingForm != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Add Inflected Form to <strong lang="el">@activeWordForAddingForm.GreekLemma</strong></h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseFormModal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <EditForm Model="newForm" OnValidSubmit="SaveWordForm" FormName="AddWordFormForm">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Greek Form</label>
+                            <input type="text" class="form-control text-primary fw-bold" @bind-value="newForm.Form" placeholder="e.g. λόγοι, λύει" required lang="el" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Morphology/Grammar Info</label>
+                            <input type="text" class="form-control" @bind-value="newForm.Morphology" placeholder="e.g. Nominative Plural Masculine" />
+                        </div>
+                        <div class="text-end mt-4">
+                            <button type="button" class="btn btn-outline-secondary me-2" @onclick="CloseFormModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Form</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Word> words = new();
+    private bool showAddForm = false;
+    private Word newWord = new();
+
+    private Word? activeWordForAddingForm;
+    private WordForm newForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWords();
+    }
+
+    private async Task LoadWords()
+    {
+        words = await DbContext.Words
+            .Include(w => w.WordForms)
+            .OrderBy(w => w.GreekLemma)
+            .ToListAsync();
+    }
+
+    private void ShowAddWordForm()
+    {
+        newWord = new Word { PartOfSpeech = PartOfSpeech.Noun };
+        showAddForm = true;
+    }
+
+    private void CancelAddForm()
+    {
+        showAddForm = false;
+    }
+
+    private async Task SaveNewWord()
+    {
+        // Simple normalization before saving
+        newWord.GreekLemma = newWord.GreekLemma.Trim();
+        newWord.DefinitionEn = newWord.DefinitionEn.Trim();
+        
+        DbContext.Words.Add(newWord);
+        await DbContext.SaveChangesAsync();
+        
+        showAddForm = false;
+        await LoadWords();
+    }
+
+    private async Task DeleteWord(Word word)
+    {
+        DbContext.Words.Remove(word);
+        await DbContext.SaveChangesAsync();
+        await LoadWords();
+    }
+
+    private void ShowAddFormModal(Word word)
+    {
+        activeWordForAddingForm = word;
+        newForm = new WordForm { WordId = word.Id };
+    }
+
+    private void CloseFormModal()
+    {
+        activeWordForAddingForm = null;
+    }
+
+    private async Task SaveWordForm()
+    {
+        if (activeWordForAddingForm == null) return;
+
+        newForm.Form = newForm.Form.Trim();
+        
+        // Use clean normalization from GreekTextParser for storage or matching validation if wanted
+        var parser = new GreekTextParser();
+        // Standardize the inflected form for lookup (lowercase and normalized spacing)
+        
+        DbContext.WordForms.Add(newForm);
+        await DbContext.SaveChangesAsync();
+        
+        CloseFormModal();
+        await LoadWords();
+    }
+
+    private async Task DeleteWordForm(WordForm form)
+    {
+        DbContext.WordForms.Remove(form);
+        await DbContext.SaveChangesAsync();
+        await LoadWords();
+    }
+}

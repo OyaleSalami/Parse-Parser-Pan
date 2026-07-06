@@ -1,0 +1,384 @@
+@page "/editor"
+@rendermode InteractiveServer
+@inject PanDbContext DbContext
+@inject IGreekTextParser TextParser
+
+<div class="container-fluid py-4 px-lg-5">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-5 text-primary fw-bold"><i class="bi bi-pencil-square"></i> Greek Reader & Editor</h1>
+            <p class="text-muted">Import Greek passages and read them with interactive, color-coded dictionary highlights.</p>
+        </div>
+        <div class="col-auto align-self-center">
+            <button class="btn btn-outline-primary shadow-sm" @onclick="ShowNewTextForm">
+                <i class="bi bi-plus-lg"></i> Import New Text
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Sidebar: Texts List -->
+        <div class="col-lg-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light fw-bold py-3">
+                    <i class="bi bi-file-earmark-text text-primary"></i> Saved Texts
+                </div>
+                <div class="list-group list-group-flush scrollable-list" style="max-height: 500px; overflow-y: auto;">
+                    @if (texts == null || !texts.Any())
+                    {
+                        <div class="p-3 text-center text-muted">
+                            No texts imported yet.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var txt in texts)
+                        {
+                            <button type="button" 
+                                    class="list-group-item list-group-item-action py-3 @(selectedText?.Id == txt.Id ? "active fw-semibold" : "")"
+                                    @onclick="() => SelectText(txt)">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1 text-truncate">@txt.Title</h6>
+                                </div>
+                                <small class="text-muted @(selectedText?.Id == txt.Id ? "text-white-50" : "")">
+                                    Added @txt.CreatedAt.ToString("g")
+                                </small>
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="col-lg-9">
+            @if (isCreatingNewText)
+            {
+                <!-- Import Form -->
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-primary text-white py-3">
+                        <h4 class="mb-0"><i class="bi bi-cloud-upload"></i> Import Greek Passage</h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <EditForm Model="newText" OnValidSubmit="SaveNewText" FormName="AddTextForm">
+                            <DataAnnotationsValidator />
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Title</label>
+                                <input type="text" class="form-control" @bind-value="newText.Title" placeholder="e.g. John 1:1-5, Plato's Apology" required />
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-primary">Greek Content (Unicode Supported)</label>
+                                    <textarea class="form-control text-primary font-greek fw-semibold" @bind="newText.GreekContent" rows="12" placeholder="Paste Greek text here..." required lang="el"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">English Translation / Parallel Text</label>
+                                    <textarea class="form-control" @bind="newText.EnglishTranslation" rows="12" placeholder="Paste English translation here..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="text-end mt-4">
+                                <button type="button" class="btn btn-outline-secondary me-2" @onclick="CancelNewText">Cancel</button>
+                                <button type="submit" class="btn btn-primary px-4">Import Text</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            }
+            else if (selectedText != null)
+            {
+                <!-- Text Viewer & Highlight Details -->
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-3">
+                                <h4 class="mb-0 fw-bold text-dark">@selectedText.Title</h4>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="DeleteSelectedText">
+                                    <i class="bi bi-trash"></i> Delete Text
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <ul class="nav nav-tabs mb-3" id="textTab" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="greek-tab" data-bs-toggle="tab" data-bs-target="#greek-pane" type="button" role="tab">Greek Reader</button>
+                                    </li>
+                                    @if (!string.IsNullOrEmpty(selectedText.EnglishTranslation))
+                                    {
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="parallel-tab" data-bs-toggle="tab" data-bs-target="#parallel-pane" type="button" role="tab">Parallel Translation</button>
+                                        </li>
+                                    }
+                                </ul>
+
+                                <div class="tab-content" id="myTabContent">
+                                    <!-- Greek Reader Tab -->
+                                    <div class="tab-pane fade show active" id="greek-pane" role="tabpanel" tabindex="0">
+                                        <div class="greek-text-container leading-loose fs-3 font-greek py-2 text-dark" style="white-space: pre-wrap; line-height: 2.2;">
+                                            @foreach (var token in parsedTokens)
+                                            {
+                                                if (token.IsHighlighted)
+                                                {
+                                                    <span class="highlight-word cursor-pointer text-primary border-bottom border-primary border-2 fw-semibold" 
+                                                          @onclick="() => LookUpWord(token.NormalizedValue)" 
+                                                          style="cursor: pointer;">@token.RawValue</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@token.RawValue</span>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <!-- Parallel Translation Tab -->
+                                    @if (!string.IsNullOrEmpty(selectedText.EnglishTranslation))
+                                    {
+                                        <div class="tab-pane fade" id="parallel-pane" role="tabpanel" tabindex="0">
+                                            <div class="row">
+                                                <div class="col-md-6 border-end pe-4">
+                                                    <h5 class="text-secondary fw-semibold mb-3">Greek</h5>
+                                                    <div class="fs-4 font-greek text-dark" style="white-space: pre-wrap; line-height: 2.0;">
+                                                        @foreach (var token in parsedTokens)
+                                                        {
+                                                            if (token.IsHighlighted)
+                                                            {
+                                                                <span class="highlight-word cursor-pointer text-primary border-bottom border-primary border-2 fw-semibold" 
+                                                                      @onclick="() => LookUpWord(token.NormalizedValue)" 
+                                                                      style="cursor: pointer;">@token.RawValue</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span>@token.RawValue</span>
+                                                            }
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6 ps-4">
+                                                    <h5 class="text-secondary fw-semibold mb-3">English</h5>
+                                                    <div class="fs-5 text-muted" style="white-space: pre-wrap; line-height: 1.8;">
+                                                        @selectedText.EnglishTranslation
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Info / Word Detail View -->
+                    <div class="col-md-4">
+                        <div class="card shadow-sm border-0 sticky-top" style="top: 2rem;">
+                            <div class="card-header bg-primary text-white py-3">
+                                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Word Grammatical Details</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                @if (selectedWordDetails == null)
+                                {
+                                    <div class="text-center py-5 text-muted">
+                                        <i class="bi bi-cursor-fill display-5 d-block mb-3 text-secondary"></i>
+                                        Click on any highlighted Greek word to view definition and parsing information.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="word-details">
+                                        <h3 class="text-primary fw-bold mb-1" lang="el">@selectedWordDetails.GreekLemma</h3>
+                                        <span class="badge bg-secondary mb-3 px-3 py-2">@selectedWordDetails.PartOfSpeech</span>
+                                        
+                                        <div class="mb-3">
+                                            <h6 class="text-uppercase text-muted fw-bold small">Definition</h6>
+                                            <p class="fs-5 text-dark">@selectedWordDetails.DefinitionEn</p>
+                                        </div>
+
+                                        @if (!string.IsNullOrEmpty(selectedWordDetails.Notes))
+                                        {
+                                            <div class="mb-3">
+                                                <h6 class="text-uppercase text-muted fw-bold small">Usage Notes</h6>
+                                                <p class="text-dark bg-light p-2 rounded small" style="white-space: pre-wrap;">@selectedWordDetails.Notes</p>
+                                            </div>
+                                        }
+
+                                        @if (matchedFormsForSelectedWord != null && matchedFormsForSelectedWord.Any())
+                                        {
+                                            <div class="mb-3">
+                                                <h6 class="text-uppercase text-muted fw-bold small">Inflected Forms Found</h6>
+                                                <div class="list-group">
+                                                    @foreach (var form in matchedFormsForSelectedWord)
+                                                    {
+                                                        <div class="list-group-item p-2">
+                                                            <div class="d-flex justify-content-between">
+                                                                <strong class="text-primary" lang="el">@form.Form</strong>
+                                                                <span class="text-muted small">@form.Morphology</span>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card shadow-sm border-0 py-5 text-center bg-light">
+                    <div class="card-body">
+                        <i class="bi bi-file-earmark-richtext display-3 text-muted mb-3"></i>
+                        <h3>Select a text to read</h3>
+                        <p class="text-muted">Choose a passage from the sidebar or import a new one to begin reading and analysis.</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Text> texts = new();
+    private Text? selectedText;
+    private bool isCreatingNewText = false;
+    private Text newText = new();
+
+    private List<TextToken> parsedTokens = new();
+    private Word? selectedWordDetails;
+    private List<WordForm> matchedFormsForSelectedWord = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTexts();
+    }
+
+    private async Task LoadTexts()
+    {
+        texts = await DbContext.Texts
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+    }
+
+    private void ShowNewTextForm()
+    {
+        newText = new Text();
+        isCreatingNewText = true;
+    }
+
+    private void CancelNewText()
+    {
+        isCreatingNewText = false;
+    }
+
+    private async Task SaveNewText()
+    {
+        newText.CreatedAt = DateTime.UtcNow;
+        DbContext.Texts.Add(newText);
+        await DbContext.SaveChangesAsync();
+        
+        isCreatingNewText = false;
+        await LoadTexts();
+        selectedText = newText;
+        await AnalyzeSelectedText();
+    }
+
+    private async Task SelectText(Text txt)
+    {
+        selectedText = txt;
+        isCreatingNewText = false;
+        selectedWordDetails = null;
+        matchedFormsForSelectedWord.Clear();
+        await AnalyzeSelectedText();
+    }
+
+    private async Task DeleteSelectedText()
+    {
+        if (selectedText == null) return;
+        DbContext.Texts.Remove(selectedText);
+        await DbContext.SaveChangesAsync();
+        
+        selectedText = null;
+        selectedWordDetails = null;
+        matchedFormsForSelectedWord.Clear();
+        await LoadTexts();
+    }
+
+    private async Task AnalyzeSelectedText()
+    {
+        if (selectedText == null) return;
+
+        // Fetch all known forms and lemmas from dictionary database, normalized
+        var lemmas = await DbContext.Words.Select(w => w.GreekLemma).ToListAsync();
+        var inflectedForms = await DbContext.WordForms.Select(wf => wf.Form).ToListAsync();
+
+        var normalizedDictionary = new HashSet<string>();
+        foreach (var l in lemmas)
+        {
+            normalizedDictionary.Add(TextParser.NormalizeGreek(l));
+        }
+        foreach (var f in inflectedForms)
+        {
+            normalizedDictionary.Add(TextParser.NormalizeGreek(f));
+        }
+
+        parsedTokens = TextParser.Tokenize(selectedText.GreekContent, normalizedDictionary);
+    }
+
+    private async Task LookUpWord(string normalizedValue)
+    {
+        // 1. Try to find a direct match in WordForms or Words
+        // Search through WordForms matching normalized form
+        var parsedFormMatch = await DbContext.WordForms
+            .Include(wf => wf.Word)
+            .FirstOrDefaultAsync(wf => wf.Form == normalizedValue);
+
+        if (parsedFormMatch != null && parsedFormMatch.Word != null)
+        {
+            selectedWordDetails = parsedFormMatch.Word;
+        }
+        else
+        {
+            // Try to find direct match in Words (lemmas)
+            selectedWordDetails = await DbContext.Words
+                .FirstOrDefaultAsync(w => w.GreekLemma == normalizedValue);
+        }
+
+        // Fallback: search using NormalizedGreek matching in case diacritics are different in DB
+        if (selectedWordDetails == null)
+        {
+            var allWords = await DbContext.Words.Include(w => w.WordForms).ToListAsync();
+            foreach (var w in allWords)
+            {
+                if (TextParser.NormalizeGreek(w.GreekLemma) == normalizedValue)
+                {
+                    selectedWordDetails = w;
+                    break;
+                }
+                foreach (var f in w.WordForms)
+                {
+                    if (TextParser.NormalizeGreek(f.Form) == normalizedValue)
+                    {
+                        selectedWordDetails = w;
+                        break;
+                    }
+                }
+                if (selectedWordDetails != null) break;
+            }
+        }
+
+        if (selectedWordDetails != null)
+        {
+            // Load matched inflections to display morphology information
+            matchedFormsForSelectedWord = await DbContext.WordForms
+                .Where(wf => wf.WordId == selectedWordDetails.Id)
+                .ToListAsync();
+        }
+        else
+        {
+            matchedFormsForSelectedWord.Clear();
+        }
+    }
+}

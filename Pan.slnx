@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Pan.Core/Pan.Core.csproj" />
+  <Project Path="Pan.Editor/Pan.Editor.csproj" />
+  <Project Path="Pan.Infrastructure/Pan.Infrastructure.csproj" />
+  <Project Path="Pan.Web/Pan.Web.csproj" />
+</Solution>

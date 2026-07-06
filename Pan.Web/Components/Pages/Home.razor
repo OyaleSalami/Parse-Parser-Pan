@@ -1,0 +1,59 @@
+@page "/"
+
+<PageTitle>Pan - Koine Greek Learning Platform</PageTitle>
+
+<div class="container py-5">
+    <!-- Hero / Intro -->
+    <div class="p-5 mb-5 rounded-4 bg-primary text-white shadow-lg position-relative overflow-hidden" style="background: linear-gradient(135deg, #3a7bd5, #3a6073);">
+        <div class="row align-items-center position-relative z-index-1">
+            <div class="col-md-8">
+                <h1 class="display-3 fw-bold mb-3">Pan (Πᾶν)</h1>
+                <p class="fs-4 mb-4">An interactive reader, dictionary tracker, and morphology helper built specifically for studying Koine Greek texts.</p>
+                <div class="d-flex gap-2">
+                    <a href="/editor" class="btn btn-light btn-lg px-4 text-primary fw-semibold shadow-sm"><i class="bi bi-pencil-square"></i> Open Reader & Editor</a>
+                    <a href="/dictionary" class="btn btn-outline-light btn-lg px-4"><i class="bi bi-book"></i> Open Dictionary</a>
+                </div>
+            </div>
+            <div class="col-md-4 text-center d-none d-md-block">
+                <div class="display-1 fw-bold opacity-25 font-greek" style="font-size: 8rem; line-height: 1;">α ω</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Features -->
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 transition-transform hover-scale">
+                <div class="card-body p-4">
+                    <div class="feature-icon bg-primary-subtle text-primary rounded-3 p-3 mb-3 d-inline-block">
+                        <i class="bi bi-spellcheck fs-3"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2">Smart Parsing</h3>
+                    <p class="text-muted">Unicode diacritic-insensitive parser automatically links forms like <span class="font-greek">λόγος</span>, <span class="font-greek">λόγοι</span>, or <span class="font-greek">λόγῳ</span> back to their base dictionary lemma.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 transition-transform hover-scale">
+                <div class="card-body p-4">
+                    <div class="feature-icon bg-success-subtle text-success rounded-3 p-3 mb-3 d-inline-block">
+                        <i class="bi bi-journal-text fs-3"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2">Grammar & Lemma Tracking</h3>
+                    <p class="text-muted">Track specific grammatical fields—including verb forms, nouns, pronouns, adjectives, and morphological annotations—for each word.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 transition-transform hover-scale">
+                <div class="card-body p-4">
+                    <div class="feature-icon bg-info-subtle text-info rounded-3 p-3 mb-3 d-inline-block">
+                        <i class="bi bi-book-half fs-3"></i>
+                    </div>
+                    <h3 class="fw-bold mb-2">Parallel Texts</h3>
+                    <p class="text-muted">Read Greek side-by-side with your English translations or notes. Click any highlighted vocabulary word to view instant details.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
